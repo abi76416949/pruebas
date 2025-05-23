@@ -173,49 +173,75 @@ class UsuarioDAO extends Model implements CRUD
         return $objUsuario;
     }
 
-    public function login($data)
-    {
-        require_once 'usuarioDTO.php';
-        $query = $this->db->prepare("SELECT u.id_usuario, u.nombre, u.apellido_paterno, u.apellido_materno, u.email, u.password_usuario, u.imagen, u.calle, u.estado, u.municipio, u.colonia, u.codigo_postal, u.id_rol, ug.id_gimnasio,
-        (CASE WHEN u.id_rol = 2 AND EXISTS
-            (SELECT 1 FROM pago_plan_sistema pps WHERE pps.id_usuario = u.id_usuario AND pps.vencimiento > CURDATE()) THEN 1 ELSE 0
-        END) as is_active
+public function login($data)
+{
+    require_once 'usuarioDTO.php';
+
+    // Encriptar password
+    $password = sha1($data['passwordUsuario']);
+    ob_clean(); // 🔧 Limpia cualquier salida anterior (espacios, errores, HTML)
+    header('Content-Type: application/json'); 
+    // Preparar consulta
+    $query = $this->db->prepare("
+        SELECT u.id_usuario, u.nombre, u.apellido_paterno, u.apellido_materno, u.email, u.password_usuario, u.imagen, u.calle, u.estado, u.municipio, u.colonia, u.codigo_postal, u.id_rol, ug.id_gimnasio,
+        (CASE WHEN u.id_rol = 2 AND EXISTS (
+            SELECT 1 FROM pago_plan_sistema pps 
+            WHERE pps.id_usuario = u.id_usuario AND pps.vencimiento > CURDATE()
+        ) THEN 1 ELSE 0 END) as is_active
         FROM usuario AS u
         LEFT JOIN usuario_gimnasio AS ug ON u.id_usuario = ug.id_usuario
-        WHERE u.email = :emailUsuario AND u.password_usuario = :passwordUsuario");
-        $password = sha1($data['passwordUsuario']);
-        $query->bindParam(":emailUsuario", $data['emailUsuario']);
-        $query->bindParam(":passwordUsuario", $password);
-        $query->execute();
-        $result = $query->fetchAll(PDO::FETCH_ASSOC);
-        if (count($result) === 1) {
-            $row = $result[0];
-            if ($row['is_active'] === 0 && $row['id_rol'] === 2) {
-                echo json_encode(array("warning" => true));
-                return;
-            }
-            session_start();
-            $_SESSION['id_usuario'] = $row['id_usuario'];
-            $_SESSION['id_gimnasio'] = $row['id_gimnasio'];
-            $_SESSION['nombreUsuario'] = $row['nombre'];
-            $_SESSION['apellidoPaternoUsuario'] = $row['apellido_paterno'];
-            $_SESSION['apellidoMaternoUsuario'] = $row['apellido_materno'];
-            $_SESSION['emailUsuario'] = $row['email'];
-            $_SESSION['passwordUsuario'] = $row['password_usuario'];
-            $_SESSION['imagen'] = $row['imagen'];
-            $_SESSION['calleUsuario'] = $row['calle'];
-            $_SESSION['estadoUsuario'] = $row['estado'];
-            $_SESSION['municipioUsuario'] = $row['municipio'];
-            $_SESSION['coloniaUsuario'] = $row['colonia'];
-            $_SESSION['codigoPostalUsuario'] = $row['codigo_postal'];
-            $_SESSION['id_rol'] = $row['id_rol'];
-            $_SESSION['login'] = true;
-            $_SESSION['permisos'] = $this->getPermisos($row['id_rol']);
-            echo json_encode(array("success" => true));
-            return;
+        WHERE u.email = :emailUsuario AND u.password_usuario = :passwordUsuario
+    ");
+
+    // Enlazar valores
+    $query->bindParam(":emailUsuario", $data['emailUsuario']);
+    $query->bindParam(":passwordUsuario", $password);
+    $query->execute();
+
+    // Obtener resultado
+    $result = $query->fetchAll(PDO::FETCH_ASSOC);
+
+    // Si encontró usuario
+    if (count($result) === 1) {
+        $row = $result[0];
+
+        // Si es usuario rol 2 (cliente) pero sin pago activo
+        if ($row['is_active'] === 0 && $row['id_rol'] === 2) {
+            return array("warning" => true);
         }
-        echo json_encode(array("error" => "Usuario y Contraseña incorrectos"));
+
+        error_log("Login exitoso, datos del usuario: " . print_r($row, true));
+
+        // ✅ Verifica si la sesión ya está activa
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+
+        // Guardar en sesión
+        $_SESSION['id_usuario'] = $row['id_usuario'];
+        $_SESSION['id_gimnasio'] = $row['id_gimnasio'];
+        $_SESSION['nombreUsuario'] = $row['nombre'];
+        $_SESSION['apellidoPaternoUsuario'] = $row['apellido_paterno'];
+        $_SESSION['apellidoMaternoUsuario'] = $row['apellido_materno'];
+        $_SESSION['emailUsuario'] = $row['email'];
+        $_SESSION['passwordUsuario'] = $row['password_usuario'];
+        $_SESSION['imagen'] = $row['imagen'];
+        $_SESSION['calleUsuario'] = $row['calle'];
+        $_SESSION['estadoUsuario'] = $row['estado'];
+        $_SESSION['municipioUsuario'] = $row['municipio'];
+        $_SESSION['coloniaUsuario'] = $row['colonia'];
+        $_SESSION['codigoPostalUsuario'] = $row['codigo_postal'];
+        $_SESSION['id_rol'] = $row['id_rol'];
+        $_SESSION['login'] = true;
+        $_SESSION['permisos'] = $this->getPermisos($row['id_rol']);
+
+        return array("success" => true);
     }
+
+    // Si no encontró usuario
+    return array("error" => "Usuario y Contraseña incorrectos");
+}
+
     
     public function getPermisos($idrol)
     {

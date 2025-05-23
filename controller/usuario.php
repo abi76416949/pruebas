@@ -138,6 +138,10 @@ class Usuario extends Controller
 
 	function login()
 	{
+		if (session_status() !== PHP_SESSION_ACTIVE) {
+			session_start();
+		}
+
 		$emailUsuario = $_POST['email'];
 		$passwordUsuario = $_POST['password'];
 		$data = array('emailUsuario' => $emailUsuario, 'passwordUsuario' => $passwordUsuario);
@@ -145,8 +149,13 @@ class Usuario extends Controller
 		require 'model/usuarioDAO.php';
 		$this->loadModel('UsuarioDAO');
 		$usuarioDAO = new UsuarioDAO();
-		$usuarioDAO->login($data);
+		$resultado = $usuarioDAO->login($data);
+
+		// Aquí se imprimen los headers
+		header('Content-Type: application/json');
+		echo json_encode($resultado);
 	}
+
 
 	function insertGymAndPlanSistema()
 	{

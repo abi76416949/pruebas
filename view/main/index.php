@@ -65,6 +65,7 @@
                 data: datos,
                 dataType: "json",
                 success: function (data) {
+                    console.log(data); 
                     if (data.error) {
                         Swal.fire(
                             "¡Error!",
@@ -84,7 +85,12 @@
                     if (data.success) {
                         window.location = "<?php echo constant('URL'); ?>dashboard";
                     }
+                    
                 },
+                error: function (xhr, status, error) {
+                    console.error("Error en la petición AJAX:", error);
+                    Swal.fire("¡Error!", "Error en el servidor o conexión.", "error");
+                }
             });
         })
     })

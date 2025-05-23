@@ -1,4 +1,5 @@
 <?php
+	ob_start(); 
     require_once 'libs/conexion.php';
     require_once 'libs/controller.php';
 	require_once 'libs/model.php';
